@@ -19,21 +19,23 @@ jobs:
         shell: bash
         run: |
           set -eu
-          test -L sandbox/extract/link
-          test "$(readlink sandbox/extract/link)" = '../../trusted'
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          ln -s "$GITHUB_WORKSPACE/trusted" "$RUNNER_TEMP/artifacts/link"
+          test -L "$RUNNER_TEMP/artifacts/link"
           test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
             'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
-          test ! -e GH_R243_PRIVILEGED_WRITE_FINAL.txt
-          printf 'GH_R243_FINAL_BEFORE trusted_sha256=%s symlink_target=%s durable_absent=yes\n' \
+          test ! -e GH_R243_TEMP_ISOLATION_WRITE.txt
+          printf 'GH_R243_TEMP_BEFORE trusted_sha256=%s download_root=%s symlink_target=%s durable_absent=yes\n' \
             "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" \
-            "$(readlink -f sandbox/extract/link)"
+            "$RUNNER_TEMP/artifacts" \
+            "$(readlink -f "$RUNNER_TEMP/artifacts/link")"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ github.event.workflow_run.id }}
           name: untrusted-data
-          path: ${{ github.workspace }}/sandbox/extract
+          path: ${{ runner.temp }}/artifacts
       - name: Execute trusted consumer
         shell: bash
         env:
@@ -45,5 +47,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          gh api "repos/$GITHUB_REPOSITORY/contents/GH_R243_PRIVILEGED_WRITE_FINAL.txt?ref=main" \
+          gh api "repos/$GITHUB_REPOSITORY/contents/GH_R243_TEMP_ISOLATION_WRITE.txt?ref=main" \
             --jq '{sha:.sha,content:(.content|@base64d)}'
