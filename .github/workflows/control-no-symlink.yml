@@ -1,0 +1,44 @@
+name: GH-R243 no-symlink control
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  control:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Canonical state before control
+        shell: bash
+        run: |
+          set -eu
+          test ! -e sandbox/control
+          test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
+            'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
+          test ! -e GH_R243_CONTROL_WRITE.txt
+          printf 'GH_R243_CONTROL_BEFORE trusted_sha256=%s clean_destination=yes durable_absent=yes\n' \
+            "$(sha256sum trusted/consume.sh | cut -d' ' -f1)"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: '31453948417'
+          name: untrusted-data
+          path: ${{ github.workspace }}/sandbox/control
+      - name: Prove same attacker bytes remain confined and inert
+        shell: bash
+        run: |
+          set -eu
+          test -f sandbox/control/link/consume.sh
+          test ! -x sandbox/control/link/consume.sh
+          test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
+            'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
+          test ! -e GH_R243_CONTROL_WRITE.txt
+          bash trusted/consume.sh
+          printf 'GH_R243_CONTROL_AFTER attacker_file=%s attacker_executable=no trusted_sha256=%s durable_absent=yes\n' \
+            "$(realpath sandbox/control/link/consume.sh)" \
+            "$(sha256sum trusted/consume.sh | cut -d' ' -f1)"
