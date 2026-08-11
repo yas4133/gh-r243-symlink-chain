@@ -16,7 +16,7 @@ jobs:
         shell: bash
         run: |
           set -eu
-          test ! -e sandbox/control
+          test ! -e "$RUNNER_TEMP/control"
           test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
             'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
           test ! -e GH_R243_CONTROL_WRITE.txt
@@ -26,19 +26,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
-          run-id: '31453948417'
+          run-id: '31455764634'
           name: untrusted-data
-          path: ${{ github.workspace }}/sandbox/control
+          path: ${{ runner.temp }}/control
       - name: Prove same attacker bytes remain confined and inert
         shell: bash
         run: |
           set -eu
-          test -f sandbox/control/link/consume.sh
-          test ! -x sandbox/control/link/consume.sh
+          test -f "$RUNNER_TEMP/control/link/consume.sh"
+          test ! -x "$RUNNER_TEMP/control/link/consume.sh"
           test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
             'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
           test ! -e GH_R243_CONTROL_WRITE.txt
           bash trusted/consume.sh
           printf 'GH_R243_CONTROL_AFTER attacker_file=%s attacker_executable=no trusted_sha256=%s durable_absent=yes\n' \
-            "$(realpath sandbox/control/link/consume.sh)" \
+            "$(realpath "$RUNNER_TEMP/control/link/consume.sh")" \
             "$(sha256sum trusted/consume.sh | cut -d' ' -f1)"
