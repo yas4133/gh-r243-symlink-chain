@@ -1,0 +1,28 @@
+name: Untrusted data producer
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  package-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Confirm data-only input
+        shell: bash
+        run: |
+          set -eu
+          test -f payload/link/consume.sh
+          test ! -x payload/link/consume.sh
+          printf 'GH_R243_PRODUCER data_only=yes path=payload/link/consume.sh sha256=%s\n' \
+            "$(sha256sum payload/link/consume.sh | cut -d' ' -f1)"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: untrusted-data
+          path: payload
+

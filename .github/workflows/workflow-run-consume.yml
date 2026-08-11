@@ -1,0 +1,49 @@
+name: Privileged isolated-data consumer
+
+on:
+  workflow_run:
+    workflows: ["Untrusted data producer"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  consume:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Canonical trusted state before artifact
+        shell: bash
+        run: |
+          set -eu
+          test -L sandbox/extract/link
+          test "$(readlink sandbox/extract/link)" = '../../trusted'
+          test "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" = \
+            'e94896920acdeb3a547f5e7974fad2b74b6835b97f7baebcaa23d0c11795506c'
+          test ! -e GH_R243_PRIVILEGED_WRITE.txt
+          printf 'GH_R243_CONSUMER_BEFORE trusted_sha256=%s symlink_target=%s durable_absent=yes\n' \
+            "$(sha256sum trusted/consume.sh | cut -d' ' -f1)" \
+            "$(readlink -f sandbox/extract/link)"
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: untrusted-data
+          path: ${{ github.workspace }}/sandbox/extract
+      - name: Execute trusted consumer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash trusted/consume.sh
+      - name: Canonical durable state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          gh api "repos/$GITHUB_REPOSITORY/contents/GH_R243_PRIVILEGED_WRITE.txt?ref=main" \
+            --jq '{sha:.sha,content:(.content|@base64d)}'
